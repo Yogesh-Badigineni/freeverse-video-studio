@@ -50,9 +50,22 @@ def update_existing_project(project_id: str, payload: ProjectUpdate):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
         
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(project, key, value)
+    if payload.title is not None:
+        project.title = payload.title
+    if payload.description is not None:
+        project.description = payload.description
+    if payload.style is not None:
+        project.style = payload.style
+    if payload.aspect_ratio is not None:
+        project.aspect_ratio = payload.aspect_ratio
+    if payload.resolution is not None:
+        project.resolution = payload.resolution
+    if payload.fps is not None:
+        project.fps = payload.fps
+    if payload.scenes is not None:
+        project.scenes = payload.scenes
+    if payload.audio_tracks is not None:
+        project.audio_tracks = payload.audio_tracks
         
     return save_project(project)
 
