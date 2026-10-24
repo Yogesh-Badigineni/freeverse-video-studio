@@ -56,7 +56,7 @@ The studio will start the backend engine on `127.0.0.1:8000`, the frontend on `1
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/freeverse-video/freeverse-video-studio.git
+git clone https://github.com/Yogesh-Badigineni/freeverse-video-studio.git
 cd freeverse-video-studio
 ```
 

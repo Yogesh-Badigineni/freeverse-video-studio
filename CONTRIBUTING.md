@@ -12,7 +12,7 @@ Thank you for your interest in contributing to FreeVerse Video Studio! We welcom
 ### Quick Start
 1. Fork and clone the repository:
    ```bash
-   git clone https://github.com/freeverse-video/freeverse-video-studio.git
+   git clone https://github.com/Yogesh-Badigineni/freeverse-video-studio.git
    cd freeverse-video-studio
    ```
 2. Install Backend Dependencies:
