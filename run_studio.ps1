@@ -28,11 +28,14 @@ try {
 
 # 3. Start Backend
 Write-Host "[1/3] Starting FreeVerse Backend Media Engine on port 8000..." -ForegroundColor Yellow
-$backendProcess = Start-Process -FilePath "python" -ArgumentList "-m uvicorn app.main:app --app-dir `"$rootDir\backend`" --host 127.0.0.1 --port 8000" -Environment @{ PYTHONPATH = "$rootDir\backend" } -PassThru -WindowStyle Hidden
+$env:PYTHONPATH = "$rootDir\backend"
+$backendProcess = Start-Process -FilePath "python" -ArgumentList "-m uvicorn app.main:app --app-dir `"$rootDir\backend`" --host 127.0.0.1 --port 8000" -WorkingDirectory "$rootDir\backend" -PassThru -WindowStyle Hidden
 
 # 4. Start Frontend
 Write-Host "[2/3] Starting Studio Frontend UI on port 5173..." -ForegroundColor Yellow
-$frontendProcess = Start-Process -FilePath "npm" -ArgumentList "run dev" -WorkingDirectory "$rootDir\frontend" -PassThru -WindowStyle Hidden
+$npmCmd = (Get-Command "npm.cmd" -ErrorAction SilentlyContinue).Source
+if (-not $npmCmd) { $npmCmd = "npm" }
+$frontendProcess = Start-Process -FilePath $npmCmd -ArgumentList "run dev" -WorkingDirectory "$rootDir\frontend" -PassThru -WindowStyle Hidden
 
 # 5. Open Browser
 Write-Host "[3/3] Opening FreeVerse Studio in default browser..." -ForegroundColor Yellow
