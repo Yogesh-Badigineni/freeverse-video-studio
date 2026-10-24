@@ -37,6 +37,7 @@ import { ModelHubModal } from './components/ModelHubModal';
 import { RenderExportModal } from './components/RenderExportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { HelpGuideModal } from './components/HelpGuideModal';
+import { ProjectManagerModal } from './components/ProjectManagerModal';
 
 export const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -46,6 +47,7 @@ export const App: React.FC = () => {
 
   // Modals state
   const [showGallery, setShowGallery] = useState(false);
+  const [showProjectManager, setShowProjectManager] = useState(false);
   const [showPromptStudio, setShowPromptStudio] = useState(false);
   const [promptStudioInitialStyle, setPromptStudioInitialStyle] = useState<VideoStyle>('ai_generated');
   const [showAssetPicker, setShowAssetPicker] = useState(false);
@@ -218,6 +220,51 @@ export const App: React.FC = () => {
     setShowGallery(false);
   };
 
+  // Delete Project
+  const handleDeleteProject = async (id: string) => {
+    try {
+      await deleteProject(id);
+      const remaining = projects.filter((p) => p.id !== id);
+      setProjects(remaining);
+
+      if (currentProject?.id === id) {
+        if (remaining.length > 0) {
+          const nextProj = await getProject(remaining[0].id);
+          setCurrentProject(nextProj);
+          setActiveSceneIndex(0);
+        } else {
+          // If no projects left, create a fresh starter template
+          const starter = await createProject({
+            title: 'New Video Project',
+            style: 'ai_generated',
+            aspect_ratio: '16:9',
+            resolution: '1080p',
+            fps: 30
+          });
+          setProjects([starter]);
+          setCurrentProject(starter);
+          setActiveSceneIndex(0);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+      alert('Failed to delete project');
+    }
+  };
+
+  // Duplicate Project
+  const handleDuplicateProject = async (id: string) => {
+    try {
+      const duplicated = await duplicateProject(id);
+      setProjects([duplicated, ...projects]);
+      setCurrentProject(duplicated);
+      setActiveSceneIndex(0);
+    } catch (err) {
+      console.error('Failed to duplicate project:', err);
+      alert('Failed to duplicate project');
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
       {/* Top Navbar */}
@@ -230,6 +277,8 @@ export const App: React.FC = () => {
           setActiveSceneIndex(0);
         }}
         onNewProject={() => setShowGallery(true)}
+        onDeleteProject={handleDeleteProject}
+        onOpenProjectManager={() => setShowProjectManager(true)}
         onOpenGallery={() => setShowGallery(true)}
         onOpenModelHub={() => setShowModelHub(true)}
         onOpenRender={() => setShowRenderModal(true)}
@@ -400,6 +449,22 @@ export const App: React.FC = () => {
 
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+
+      {showProjectManager && (
+        <ProjectManagerModal
+          projects={projects}
+          currentProjectId={currentProject?.id || null}
+          onSelectProject={async (id) => {
+            const found = await getProject(id);
+            setCurrentProject(found);
+            setActiveSceneIndex(0);
+          }}
+          onDeleteProject={handleDeleteProject}
+          onDuplicateProject={handleDuplicateProject}
+          onNewProject={() => setShowGallery(true)}
+          onClose={() => setShowProjectManager(false)}
+        />
       )}
 
       {showHelp && (

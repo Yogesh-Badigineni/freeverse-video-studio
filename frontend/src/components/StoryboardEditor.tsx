@@ -105,6 +105,7 @@ export const StoryboardEditor: React.FC<StoryboardEditorProps> = ({
                     <img 
                       src={scene.asset_url} 
                       alt={scene.title}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                     />
                   ) : (

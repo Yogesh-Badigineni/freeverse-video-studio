@@ -8,7 +8,8 @@ import {
   FolderOpen, 
   Plus, 
   Settings,
-  Layers
+  Layers,
+  Trash2
 } from 'lucide-react';
 import { Project } from '../types/studio';
 
@@ -17,6 +18,8 @@ interface HeaderProps {
   projects: Project[];
   onSelectProject: (id: string) => void;
   onNewProject: () => void;
+  onDeleteProject: (id: string) => void;
+  onOpenProjectManager: () => void;
   onOpenGallery: () => void;
   onOpenModelHub: () => void;
   onOpenRender: () => void;
@@ -29,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
   projects,
   onSelectProject,
   onNewProject,
+  onDeleteProject,
+  onOpenProjectManager,
   onOpenGallery,
   onOpenModelHub,
   onOpenRender,
@@ -76,14 +81,14 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div style={{ height: '24px', width: '1px', background: 'var(--border-subtle)' }} />
 
-        {/* Project Selector */}
+        {/* Project Selector & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <FolderOpen size={16} color="var(--text-secondary)" />
           <select 
             className="select-field"
             value={currentProject?.id || ''}
             onChange={(e) => onSelectProject(e.target.value)}
-            style={{ maxWidth: '220px', fontWeight: 600 }}
+            style={{ maxWidth: '240px', fontWeight: 600 }}
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -93,11 +98,31 @@ export const Header: React.FC<HeaderProps> = ({
           </select>
           <button 
             className="btn btn-secondary btn-sm"
+            onClick={onOpenProjectManager}
+            title="Manage All Projects & Templates"
+          >
+            Manage
+          </button>
+          <button 
+            className="btn btn-secondary btn-sm"
             onClick={onNewProject}
             title="Create New Blank Project"
           >
             <Plus size={14} /> New
           </button>
+          {currentProject && (
+            <button 
+              className="btn btn-danger btn-sm"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to permanently delete "${currentProject.title}"?`)) {
+                  onDeleteProject(currentProject.id);
+                }
+              }}
+              title="Delete Current Project / Template"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          )}
         </div>
       </div>
 

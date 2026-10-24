@@ -30,6 +30,7 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [imgError, setImgError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Total project duration
@@ -37,6 +38,10 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
 
   // Active scene based on currentTime
   const currentScene: Scene | undefined = project.scenes[activeSceneIndex] || project.scenes[0];
+
+  useEffect(() => {
+    setImgError(false);
+  }, [currentScene?.id, currentScene?.asset_url]);
 
   // Playback timer loop
   useEffect(() => {
@@ -198,10 +203,11 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
           }}
         >
           {/* Visual Asset Layer */}
-          {currentScene?.asset_url ? (
+          {currentScene?.asset_url && !imgError ? (
             <img
               src={currentScene.asset_url}
               alt={currentScene.title}
+              onError={() => setImgError(true)}
               style={{
                 width: '100%',
                 height: '100%',
