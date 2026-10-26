@@ -58,7 +58,7 @@ export const AudioVoiceStudio: React.FC<AudioVoiceStudioProps> = ({
       .map((s) => s.voiceover_text)
       .filter(Boolean)
       .join(' ');
-    setSpeechSynthesisText(combinedScript || 'Welcome to FreeVerse Video Studio narration engine.');
+    setSpeechSynthesisText(combinedScript || '');
   }, [project.scenes]);
 
   const speakPreview = () => {

@@ -38,6 +38,9 @@ import { RenderExportModal } from './components/RenderExportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { HelpGuideModal } from './components/HelpGuideModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
+import { NewProjectModal } from './components/NewProjectModal';
+import { ConfirmModal } from './components/ConfirmModal';
+import { ToastContainer, ToastMessage } from './components/Toast';
 
 export const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -47,6 +50,7 @@ export const App: React.FC = () => {
 
   // Modals state
   const [showGallery, setShowGallery] = useState(false);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showProjectManager, setShowProjectManager] = useState(false);
   const [showPromptStudio, setShowPromptStudio] = useState(false);
   const [promptStudioInitialStyle, setPromptStudioInitialStyle] = useState<VideoStyle>('ai_generated');
@@ -58,27 +62,38 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  // In-App Toast & Confirmation State
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [sceneIndexToDelete, setSceneIndexToDelete] = useState<number | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3800);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   // Load projects on startup
   const refreshProjects = async () => {
     try {
       const data = await fetchProjects();
       setProjects(data);
-      if (data.length > 0 && !currentProject) {
-        setCurrentProject(data[0]);
-      } else if (data.length === 0) {
-        // Create initial starter showcase project
-        const starter = await createProject({
-          title: 'Welcome to FreeVerse Video Studio',
-          style: 'ai_generated',
-          aspect_ratio: '16:9',
-          resolution: '1080p',
-          fps: 30
-        });
-        setProjects([starter]);
-        setCurrentProject(starter);
+      if (data.length > 0) {
+        if (!currentProject || !data.some(p => p.id === currentProject.id)) {
+          setCurrentProject(data[0]);
+        }
+      } else {
+        setCurrentProject(null);
       }
     } catch (err) {
       console.error('Error fetching projects:', err);
+      showToast('Could not connect to local media engine. Check if backend is active.', 'error');
     }
   };
 
@@ -110,30 +125,41 @@ export const App: React.FC = () => {
 
   const handleAddScene = () => {
     if (!currentProject) return;
+    const sceneNum = currentProject.scenes.length + 1;
     const newScene: Scene = {
       id: `scene_${Date.now()}`,
-      title: `Scene ${currentProject.scenes.length + 1}`,
+      title: `Scene ${sceneNum}`,
       duration: 4.0,
-      text_overlay: 'New Scene Text',
+      text_overlay: '',
       text_position: 'bottom',
       text_color: '#FFFFFF',
       font_size: 32,
       transition: 'fade',
       transition_duration: 0.5,
-      motion_effect: 'ken_burns_zoom_in',
+      motion_effect: 'none',
       background_color: '#1A1A24',
       order: currentProject.scenes.length
     };
     const newScenes = [...currentProject.scenes, newScene];
     handleUpdateProject({ scenes: newScenes });
     setActiveSceneIndex(newScenes.length - 1);
+    showToast(`Added Scene ${sceneNum}`, 'success');
   };
 
-  const handleDeleteScene = (index: number) => {
-    if (!currentProject || currentProject.scenes.length <= 1) return;
+  const confirmDeleteScene = (index: number) => {
+    setSceneIndexToDelete(index);
+  };
+
+  const handleExecuteDeleteScene = () => {
+    if (!currentProject || sceneIndexToDelete === null) return;
+    const index = sceneIndexToDelete;
+    const sceneTitle = currentProject.scenes[index]?.title || `Scene ${index + 1}`;
     const newScenes = currentProject.scenes.filter((_, i) => i !== index);
-    handleUpdateProject({ scenes: newScenes });
-    setActiveSceneIndex(Math.max(0, index - 1));
+    const reorderedScenes = newScenes.map((s, idx) => ({ ...s, order: idx }));
+    handleUpdateProject({ scenes: reorderedScenes });
+    setActiveSceneIndex(Math.max(0, Math.min(index, reorderedScenes.length - 1)));
+    setSceneIndexToDelete(null);
+    showToast(`Deleted ${sceneTitle}`, 'info');
   };
 
   const handleDuplicateScene = (index: number) => {
@@ -149,6 +175,7 @@ export const App: React.FC = () => {
     newScenes.splice(index + 1, 0, duplicated);
     handleUpdateProject({ scenes: newScenes });
     setActiveSceneIndex(index + 1);
+    showToast(`Duplicated ${target.title}`, 'success');
   };
 
   const handleMoveScene = (fromIndex: number, toIndex: number) => {
@@ -156,7 +183,8 @@ export const App: React.FC = () => {
     const newScenes = [...currentProject.scenes];
     const [moved] = newScenes.splice(fromIndex, 1);
     newScenes.splice(toIndex, 0, moved);
-    handleUpdateProject({ scenes: newScenes });
+    const reordered = newScenes.map((s, idx) => ({ ...s, order: idx }));
+    handleUpdateProject({ scenes: reordered });
     setActiveSceneIndex(toIndex);
   };
 
@@ -168,28 +196,18 @@ export const App: React.FC = () => {
     handleUpdateProject({ audio_tracks: newTracks });
   };
 
-  const handleAddAudioTrack = (trackData?: Partial<AudioTrack>) => {
+  const handleAddAudioTrack = (track: AudioTrack) => {
     if (!currentProject) return;
-    const newTrack: AudioTrack = {
-      id: `audio_${Date.now()}`,
-      title: trackData?.title || `Audio Track ${currentProject.audio_tracks.length + 1}`,
-      type: trackData?.type || 'music',
-      start_time: trackData?.start_time || 0.0,
-      duration: trackData?.duration,
-      volume: trackData?.volume ?? 1.0,
-      fade_in: trackData?.fade_in ?? 0.5,
-      fade_out: trackData?.fade_out ?? 1.0,
-      ducking: trackData?.ducking ?? true,
-      asset_id: trackData?.asset_id,
-      asset_url: trackData?.asset_url
-    };
-    handleUpdateProject({ audio_tracks: [...currentProject.audio_tracks, newTrack] });
+    const newTracks = [...currentProject.audio_tracks, track];
+    handleUpdateProject({ audio_tracks: newTracks });
+    showToast(`Added track: ${track.title}`, 'success');
   };
 
   const handleDeleteAudioTrack = (index: number) => {
     if (!currentProject) return;
     const newTracks = currentProject.audio_tracks.filter((_, i) => i !== index);
     handleUpdateProject({ audio_tracks: newTracks });
+    showToast('Audio track removed', 'info');
   };
 
   // Asset picker handler
@@ -204,52 +222,100 @@ export const App: React.FC = () => {
       asset_url: asset.url
     });
     setShowAssetPicker(false);
+    showToast('Applied media asset to scene', 'success');
   };
 
-  // New Blank Project from Gallery
-  const handleCreateFromStyle = async (style: VideoStyle, aspect: AspectRatio) => {
-    const proj = await createProject({
-      title: `${style.replace('_', ' ').toUpperCase()} Project`,
-      style,
-      aspect_ratio: aspect,
-      resolution: '1080p',
-      fps: 30
-    });
-    setProjects([proj, ...projects]);
-    setCurrentProject(proj);
-    setShowGallery(false);
-  };
-
-  // Delete Project
-  const handleDeleteProject = async (id: string) => {
+  // Create Project Methods
+  const handleCreateBlankProject = async (params: {
+    title: string;
+    style: VideoStyle;
+    aspect_ratio: AspectRatio;
+    resolution: Resolution;
+  }) => {
     try {
-      await deleteProject(id);
-      const remaining = projects.filter((p) => p.id !== id);
-      setProjects(remaining);
-
-      if (currentProject?.id === id) {
-        if (remaining.length > 0) {
-          const nextProj = await getProject(remaining[0].id);
-          setCurrentProject(nextProj);
-          setActiveSceneIndex(0);
-        } else {
-          // If no projects left, create a fresh starter template
-          const starter = await createProject({
-            title: 'New Video Project',
-            style: 'ai_generated',
-            aspect_ratio: '16:9',
-            resolution: '1080p',
-            fps: 30
-          });
-          setProjects([starter]);
-          setCurrentProject(starter);
-          setActiveSceneIndex(0);
-        }
-      }
+      const proj = await createProject({
+        title: params.title,
+        style: params.style,
+        aspect_ratio: params.aspect_ratio,
+        resolution: params.resolution,
+        fps: 30
+      });
+      setProjects([proj, ...projects]);
+      setCurrentProject(proj);
+      setActiveSceneIndex(0);
+      showToast(`Created project: "${proj.title}"`, 'success');
     } catch (err) {
-      console.error('Failed to delete project:', err);
-      alert('Failed to delete project');
+      console.error('Failed to create project:', err);
+      showToast('Failed to create project', 'error');
     }
+  };
+
+  const handleCreateFromStyle = async (style: VideoStyle, aspect: AspectRatio) => {
+    try {
+      const proj = await createProject({
+        title: `${style.replace('_', ' ').toUpperCase()} Project`,
+        style,
+        aspect_ratio: aspect,
+        resolution: '1080p',
+        fps: 30
+      });
+      setProjects([proj, ...projects]);
+      setCurrentProject(proj);
+      setShowGallery(false);
+      setActiveSceneIndex(0);
+      showToast(`Created template project`, 'success');
+    } catch (err) {
+      console.error('Failed to create style project:', err);
+      showToast('Failed to create template project', 'error');
+    }
+  };
+
+  const handleRenameProject = async (newTitle: string) => {
+    if (!currentProject) return;
+    await handleUpdateProject({ title: newTitle });
+    showToast(`Renamed to "${newTitle}"`, 'success');
+  };
+
+  // Delete Project Handlers
+  const confirmDeleteProject = (id: string) => {
+    const proj = projects.find(p => p.id === id) || currentProject;
+    if (proj) {
+      setProjectToDelete(proj);
+    }
+  };
+
+  const handleExecuteDeleteProject = async () => {
+    if (!projectToDelete) return;
+    const id = projectToDelete.id;
+    const title = projectToDelete.title;
+
+    try {
+      await deleteProject(id).catch(err => {
+        console.warn('Backend delete project notice:', err);
+      });
+    } catch (err) {
+      console.warn('Backend delete error ignored:', err);
+    }
+
+    const remaining = projects.filter((p) => p.id !== id);
+    setProjects(remaining);
+
+    if (currentProject?.id === id) {
+      if (remaining.length > 0) {
+        try {
+          const nextProj = await getProject(remaining[0].id).catch(() => remaining[0]);
+          setCurrentProject(nextProj);
+        } catch {
+          setCurrentProject(remaining[0]);
+        }
+        setActiveSceneIndex(0);
+      } else {
+        setCurrentProject(null);
+      }
+    }
+
+    setProjectToDelete(null);
+    showToast(`Deleted "${title}"`, 'info');
   };
 
   // Duplicate Project
@@ -259,25 +325,36 @@ export const App: React.FC = () => {
       setProjects([duplicated, ...projects]);
       setCurrentProject(duplicated);
       setActiveSceneIndex(0);
+      showToast(`Duplicated "${duplicated.title}"`, 'success');
     } catch (err) {
       console.error('Failed to duplicate project:', err);
-      alert('Failed to duplicate project');
+      showToast('Failed to duplicate project', 'error');
     }
   };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
+      {/* Toast Notification Container */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
       {/* Top Navbar */}
       <Header
         currentProject={currentProject}
         projects={projects}
         onSelectProject={async (id) => {
-          const found = await getProject(id);
-          setCurrentProject(found);
-          setActiveSceneIndex(0);
+          try {
+            const found = await getProject(id).catch(() => projects.find(p => p.id === id) || null);
+            if (found) {
+              setCurrentProject(found);
+              setActiveSceneIndex(0);
+            }
+          } catch (err) {
+            console.error('Project switch error:', err);
+          }
         }}
-        onNewProject={() => setShowGallery(true)}
-        onDeleteProject={handleDeleteProject}
+        onNewProject={() => setShowNewProjectModal(true)}
+        onDeleteProject={confirmDeleteProject}
+        onRenameProject={handleRenameProject}
         onOpenProjectManager={() => setShowProjectManager(true)}
         onOpenGallery={() => setShowGallery(true)}
         onOpenModelHub={() => setShowModelHub(true)}
@@ -305,6 +382,11 @@ export const App: React.FC = () => {
               activeSceneIndex={activeSceneIndex}
               onSelectScene={(idx) => setActiveSceneIndex(idx)}
               onUpdateProjectSettings={(aspect, res) => handleUpdateProject({ aspect_ratio: aspect, resolution: res })}
+              onAddScene={handleAddScene}
+              onOpenPromptStudio={() => {
+                setPromptStudioInitialStyle(currentProject.style);
+                setShowPromptStudio(true);
+              }}
             />
 
             <TimelineTracks
@@ -338,18 +420,21 @@ export const App: React.FC = () => {
                     setPromptStudioInitialStyle(currentProject.style);
                     setShowPromptStudio(true);
                   }}
+                  title="Generate scenes from prompt or document"
                 >
                   <Sparkles size={14} /> AI Script Assistant
                 </button>
                 <button 
                   className="btn btn-secondary btn-sm"
                   onClick={() => setShowAudioStudio(true)}
+                  title="Voiceover narration and background music"
                 >
                   <Music size={14} /> Audio & Voice
                 </button>
                 <button 
                   className="btn btn-secondary btn-sm"
                   onClick={() => setShowAssetPicker(true)}
+                  title="Upload and browse images and video clips"
                 >
                   <ImageIcon size={14} /> Media Assets
                 </button>
@@ -367,24 +452,93 @@ export const App: React.FC = () => {
               onSelectScene={(idx) => setActiveSceneIndex(idx)}
               onUpdateScene={handleUpdateScene}
               onAddScene={handleAddScene}
-              onDeleteScene={handleDeleteScene}
+              onDeleteScene={confirmDeleteScene}
               onDuplicateScene={handleDuplicateScene}
               onMoveScene={handleMoveScene}
               onOpenAssetPicker={handleOpenAssetPicker}
+              onOpenPromptStudio={() => {
+                setPromptStudioInitialStyle(currentProject.style);
+                setShowPromptStudio(true);
+              }}
             />
           </div>
         </main>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>Welcome to FreeVerse Video Studio</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>Open the creation gallery to start your first video</p>
-            <button className="btn btn-primary" onClick={() => setShowGallery(true)}>
-              <Sparkles size={16} /> Open Video Gallery
-            </button>
+        /* Empty State / Welcome Screen */
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+          <div style={{
+            maxWidth: '540px',
+            textAlign: 'center',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '48px 36px',
+            boxShadow: 'var(--shadow-lg)'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              background: 'var(--grad-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              boxShadow: '0 8px 24px var(--primary-glow)'
+            }}>
+              <Film size={32} color="#FFFFFF" />
+            </div>
+
+            <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '10px' }}>
+              Welcome to FreeVerse Video Studio
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px' }}>
+              100% Free, open source, zero cloud costs. Create cinematic videos, social shorts, animated stories, and explainers with local FFmpeg rendering.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowNewProjectModal(true)}
+                style={{ padding: '12px 20px', fontSize: '14px', fontWeight: 700 }}
+              >
+                <Plus size={16} /> Create New Video
+              </button>
+
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  setPromptStudioInitialStyle('ai_generated');
+                  setShowPromptStudio(true);
+                }}
+                style={{ padding: '10px 20px', fontSize: '13px' }}
+              >
+                <Sparkles size={15} /> AI Script Assistant
+              </button>
+
+              <button 
+                className="btn btn-outline"
+                onClick={() => setShowGallery(true)}
+                style={{ padding: '10px 20px', fontSize: '13px' }}
+              >
+                <Layers size={15} /> Video Styles Gallery
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* New Project Modal */}
+      <NewProjectModal
+        isOpen={showNewProjectModal}
+        onClose={() => setShowNewProjectModal(false)}
+        onCreateBlank={handleCreateBlankProject}
+        onOpenAIScriptStudio={() => {
+          setPromptStudioInitialStyle('ai_generated');
+          setShowPromptStudio(true);
+        }}
+        onOpenTemplates={() => setShowGallery(true)}
+      />
 
       {/* Modals */}
       {showGallery && (
@@ -415,6 +569,7 @@ export const App: React.FC = () => {
             setProjects([newProj, ...projects]);
             setCurrentProject(newProj);
             setActiveSceneIndex(0);
+            showToast(`Generated "${newProj.title}"`, 'success');
           }}
           onClose={() => setShowPromptStudio(false)}
         />
@@ -456,13 +611,18 @@ export const App: React.FC = () => {
           projects={projects}
           currentProjectId={currentProject?.id || null}
           onSelectProject={async (id) => {
-            const found = await getProject(id);
-            setCurrentProject(found);
-            setActiveSceneIndex(0);
+            const found = await getProject(id).catch(() => projects.find(p => p.id === id) || null);
+            if (found) {
+              setCurrentProject(found);
+              setActiveSceneIndex(0);
+            }
           }}
-          onDeleteProject={handleDeleteProject}
+          onDeleteProject={confirmDeleteProject}
           onDuplicateProject={handleDuplicateProject}
-          onNewProject={() => setShowGallery(true)}
+          onNewProject={() => {
+            setShowProjectManager(false);
+            setShowNewProjectModal(true);
+          }}
           onClose={() => setShowProjectManager(false)}
         />
       )}
@@ -470,9 +630,36 @@ export const App: React.FC = () => {
       {showHelp && (
         <HelpGuideModal onClose={() => setShowHelp(false)} />
       )}
+
+      {/* Delete Project In-App Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(projectToDelete)}
+        title="Delete Video Project"
+        message={`Are you sure you want to permanently delete "${projectToDelete?.title}"? All scenes and audio tracks will be removed.`}
+        confirmLabel="Delete Project"
+        cancelLabel="Keep Project"
+        isDanger={true}
+        onConfirm={handleExecuteDeleteProject}
+        onCancel={() => setProjectToDelete(null)}
+      />
+
+      {/* Delete Scene In-App Confirmation Modal */}
+      <ConfirmModal
+        isOpen={sceneIndexToDelete !== null}
+        title="Delete Storyboard Scene"
+        message={
+          sceneIndexToDelete !== null && currentProject?.scenes[sceneIndexToDelete]
+            ? `Are you sure you want to delete Scene ${sceneIndexToDelete + 1}: "${currentProject.scenes[sceneIndexToDelete].title}"?`
+            : "Are you sure you want to delete this scene?"
+        }
+        confirmLabel="Delete Scene"
+        cancelLabel="Keep Scene"
+        isDanger={true}
+        onConfirm={handleExecuteDeleteScene}
+        onCancel={() => setSceneIndexToDelete(null)}
+      />
     </div>
   );
 };
 
 export default App;
-

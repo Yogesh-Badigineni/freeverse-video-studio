@@ -29,7 +29,7 @@ try {
 # 3. Start Backend
 Write-Host "[1/3] Starting FreeVerse Backend Media Engine on port 8000..." -ForegroundColor Yellow
 $env:PYTHONPATH = "$rootDir\backend"
-$backendProcess = Start-Process -FilePath "python" -ArgumentList "-m uvicorn app.main:app --app-dir `"$rootDir\backend`" --host 127.0.0.1 --port 8000" -WorkingDirectory "$rootDir\backend" -PassThru -WindowStyle Hidden
+$backendProcess = Start-Process -FilePath "python" -ArgumentList "-m uvicorn app.main:app --app-dir `"$rootDir\backend`" --host 127.0.0.1 --port 8000 --reload" -WorkingDirectory "$rootDir\backend" -PassThru -WindowStyle Hidden
 
 # 4. Start Frontend
 Write-Host "[2/3] Starting Studio Frontend UI on port 5173..." -ForegroundColor Yellow

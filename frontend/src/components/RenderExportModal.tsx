@@ -195,6 +195,12 @@ export const RenderExportModal: React.FC<RenderExportModalProps> = ({
               </div>
             )}
 
+            {project.scenes.length === 0 && (
+              <div style={{ padding: '10px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #F59E0B', borderRadius: '6px', color: '#FBBF24', fontSize: '12px', marginBottom: '16px' }}>
+                Please add at least one scene to the project before rendering a video.
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn btn-outline" onClick={onClose}>
                 Cancel
@@ -202,7 +208,7 @@ export const RenderExportModal: React.FC<RenderExportModalProps> = ({
               <button 
                 className="btn btn-primary"
                 onClick={handleStartExport}
-                disabled={isStarting}
+                disabled={isStarting || project.scenes.length === 0}
                 style={{ padding: '10px 24px' }}
               >
                 {isStarting ? <Loader2 size={16} className="spin" /> : <Film size={16} />}

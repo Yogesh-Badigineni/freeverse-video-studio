@@ -13,19 +13,6 @@ def get_all_projects():
 
 @router.post("", response_model=Project)
 def create_new_project(payload: ProjectCreate):
-    # Initialize with default sample scene
-    default_scene = Scene(
-        id=f"scene_{uuid.uuid4().hex[:8]}",
-        title="Opening Scene",
-        duration=4.0,
-        text_overlay="Welcome to FreeVerse Video Studio",
-        text_position="bottom",
-        transition="fade",
-        transition_duration=0.5,
-        motion_effect="ken_burns_zoom_in",
-        order=0
-    )
-    
     project = Project(
         title=payload.title,
         description=payload.description or "",
@@ -33,7 +20,7 @@ def create_new_project(payload: ProjectCreate):
         aspect_ratio=payload.aspect_ratio,
         resolution=payload.resolution,
         fps=payload.fps,
-        scenes=[default_scene]
+        scenes=[]
     )
     return save_project(project)
 
@@ -71,9 +58,7 @@ def update_existing_project(project_id: str, payload: ProjectUpdate):
 
 @router.delete("/{project_id}")
 def remove_project(project_id: str):
-    success = delete_project(project_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Project not found")
+    delete_project(project_id)
     return {"status": "success", "message": f"Project {project_id} deleted"}
 
 @router.post("/{project_id}/duplicate", response_model=Project)

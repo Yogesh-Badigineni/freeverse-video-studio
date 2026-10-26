@@ -29,7 +29,8 @@ def main():
         sys.executable, "-m", "uvicorn", "app.main:app",
         "--app-dir", str(BACKEND_DIR),
         "--host", "127.0.0.1",
-        "--port", "8000"
+        "--port", "8000",
+        "--reload"
     ]
     backend_proc = subprocess.Popen(backend_cmd, env=env)
 

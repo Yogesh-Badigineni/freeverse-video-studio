@@ -113,6 +113,119 @@ def create_procedural_scene_image(
 
     return dest
 
+def build_dynamic_scene_content(
+    clean_prompt: str,
+    style: str,
+    index: int,
+    total_scenes: int,
+    doc_lines: List[str]
+) -> Tuple[str, str, str, str]:
+    """Dynamically generates contextual title, subtitle, voiceover, and motion for a scene based on the user's prompt."""
+    topic = clean_prompt.strip()
+    words = re.findall(r'\b[A-Za-z0-9_-]+\b', topic)
+    short_topic = " ".join(words[:5]) if words else "Video Concept"
+    
+    # Progress phase in story
+    phase_ratio = index / max(1, total_scenes - 1)
+    
+    if doc_lines and index < len(doc_lines):
+        line = doc_lines[index]
+        scene_title = f"{short_topic}: Part {index + 1}"
+        scene_sub = line[:75]
+        scene_vo = f"Examining: {line}. This directly shapes our understanding of {short_topic}."
+        motion = "ken_burns_zoom_in" if index % 2 == 0 else "pan_left"
+        return scene_title, scene_sub, scene_vo, motion
+
+    if style == "cartoon":
+        if phase_ratio == 0:
+            scene_title = f"Story Time: {short_topic}"
+            scene_sub = f"An exciting adventure begins with {short_topic}"
+            scene_vo = f"Welcome everyone! Today our story takes us into the wonderful world of {topic}."
+            motion = "cartoon_bounce"
+        elif phase_ratio < 0.6:
+            scene_title = f"Exploring {short_topic}"
+            scene_sub = "Discovering new clues and exciting secrets along the way"
+            scene_vo = f"Look closely! Every step brings us closer to understanding {short_topic}."
+            motion = "ken_burns_zoom_in"
+        elif phase_ratio < 0.9:
+            scene_title = f"The Big Challenge!"
+            scene_sub = "Facing the obstacle with creativity and courage"
+            scene_vo = f"With quick thinking and determination, the challenge is met head on!"
+            motion = "cartoon_bounce"
+        else:
+            scene_title = f"Celebration & Victory"
+            scene_sub = f"A happy resolution for {short_topic}"
+            scene_vo = f"And so our joyful adventure with {short_topic} comes to an inspiring end!"
+            motion = "ken_burns_zoom_out"
+
+    elif style == "educational":
+        if phase_ratio == 0:
+            scene_title = f"Overview: {short_topic}"
+            scene_sub = f"Foundational concepts and importance of {short_topic}"
+            scene_vo = f"In this visual explainer, we examine {topic} and why it matters."
+            motion = "ken_burns_zoom_in"
+        elif phase_ratio < 0.6:
+            scene_title = f"Key Mechanics: {short_topic}"
+            scene_sub = "Breaking down the core principles step by step"
+            scene_vo = f"Let us look under the surface at the fundamental mechanisms that drive {short_topic}."
+            motion = "pan_left"
+        elif phase_ratio < 0.9:
+            scene_title = f"Real-World Impact & Analysis"
+            scene_sub = "Practical applications, experiments, and observed data"
+            scene_vo = f"Notice how this applies in practice, delivering real results and measurable impact."
+            motion = "ken_burns_zoom_in"
+        else:
+            scene_title = f"Key Takeaways & Summary"
+            scene_sub = f"Mastering the essential insights of {short_topic}"
+            scene_vo = f"To summarize: remembering these core insights gives you a complete grasp of {short_topic}."
+            motion = "ken_burns_zoom_out"
+
+    elif style == "social":
+        if phase_ratio == 0:
+            scene_title = f"Stop Scrolling! ⚡ {short_topic}"
+            scene_sub = f"The truth about {short_topic} you need right now"
+            scene_vo = f"Stop scrolling! Here is what you really need to know about {topic}."
+            motion = "ken_burns_zoom_in"
+        elif phase_ratio < 0.6:
+            scene_title = f"The Secret Behind {short_topic}"
+            scene_sub = "Here is what happens behind the scenes"
+            scene_vo = f"Most people get this completely wrong. Here is how it actually works."
+            motion = "pan_right"
+        elif phase_ratio < 0.9:
+            scene_title = f"Step-by-Step Action Plan"
+            scene_sub = "How you can apply this immediately"
+            scene_vo = f"Here is the simple, high-impact routine you can use starting today."
+            motion = "ken_burns_zoom_in"
+        else:
+            scene_title = f"Save & Share This! 🚀"
+            scene_sub = f"Follow for more daily insights on {short_topic}"
+            scene_vo = f"Double tap if this helped you and share it with someone who needs it!"
+            motion = "ken_burns_zoom_out"
+
+    else:  # natural / ai_generated / visualizer
+        if phase_ratio == 0:
+            scene_title = f"Vision: {short_topic}"
+            scene_sub = f"A visual journey into {short_topic}"
+            scene_vo = f"Entering the atmosphere of {topic}. Light, texture, and rhythm converge."
+            motion = "ken_burns_zoom_in"
+        elif phase_ratio < 0.6:
+            scene_title = f"Depth & Elements: {short_topic}"
+            scene_sub = "Nuanced details emerge across the perspective"
+            scene_vo = f"Observing the intricate details and motion within {short_topic}."
+            motion = "pan_left"
+        elif phase_ratio < 0.9:
+            scene_title = f"The Climax of Form"
+            scene_sub = "Dynamic energy reaches its peak state"
+            scene_vo = f"Every component locks into harmonious alignment as the scene evolves."
+            motion = "ken_burns_zoom_in"
+        else:
+            scene_title = f"Lasting Horizons: {short_topic}"
+            scene_sub = "A serene, lasting perspective"
+            scene_vo = f"Reflecting on the horizon of {topic}. Created with FreeVerse Video Studio."
+            motion = "ken_burns_zoom_out"
+
+    return scene_title, scene_sub, scene_vo, motion
+
 def generate_storyboard_from_prompt(req: PromptGenerateRequest) -> Project:
     """
     Transforms natural language prompt or document into a structured video project with
@@ -141,93 +254,13 @@ def generate_storyboard_from_prompt(req: PromptGenerateRequest) -> Project:
         theme = palette[i % len(palette)]
         col1, col2, tag, accent = theme
 
-        if style == "cartoon":
-            titles = [
-                f"Once Upon a Time: {clean_prompt[:30]}",
-                "A Surprising Discovery in the Meadow",
-                "Working Together to Save the Day",
-                "Celebrating Friendship and Joy!"
-            ]
-            subtitles = [
-                "A bright and sunny morning full of wonder",
-                "The cheerful heroes find an unexpected clue",
-                "Teamwork makes the biggest challenges easy",
-                "Everyone dances under the colorful rainbow!"
-            ]
-            voiceovers = [
-                f"Welcome to our story! Today we explore: {clean_prompt}.",
-                "Look over there! Something magical is happening.",
-                "With quick thinking and kindness, they overcame the obstacle.",
-                "And they lived happily ever after. The end!"
-            ]
-            motion = "cartoon_bounce" if i % 2 == 1 else "ken_burns_zoom_in"
-            
-        elif style == "educational":
-            titles = [
-                f"Introduction: {clean_prompt[:35]}",
-                "Core Concept & Foundations",
-                "Real-World Application & Data",
-                "Key Takeaways & Summary"
-            ]
-            subtitles = [
-                "Understanding the basics and why it matters",
-                doc_lines[0] if doc_lines else "Breaking down the mechanics step by step",
-                doc_lines[1] if len(doc_lines) > 1 else "How this impacts modern science and industry",
-                "Essential facts to remember for future study"
-            ]
-            voiceovers = [
-                f"In this lesson, we break down {clean_prompt}.",
-                "First, let us examine the foundational mechanism and definition.",
-                "Notice how this applies in real world observations and experiments.",
-                "To summarize, remembering these key points gives you full mastery."
-            ]
-            motion = "pan_left" if i % 2 == 1 else "ken_burns_zoom_in"
-
-        elif style == "social":
-            titles = [
-                f"Did You Know This? 🚀",
-                "Here is What Actually Happens",
-                "The 3-Step Shortcut You Need",
-                "Save & Share This Now!"
-            ]
-            subtitles = [
-                clean_prompt[:45],
-                "Most people get this completely wrong",
-                "Instant results with this proven method",
-                "Follow for more daily creative breakdowns"
-            ]
-            voiceovers = [
-                f"Stop scrolling! Here is the truth about {clean_prompt}.",
-                "Most people don't know this simple secret.",
-                "Here is the exact method you should use right now.",
-                "Double tap if this helped and share it with a friend!"
-            ]
-            motion = "ken_burns_zoom_in"
-
-        else: # natural / ai_generated
-            titles = [
-                f"Vision: {clean_prompt[:30]}",
-                "Atmosphere and Depth",
-                "Climax of the Horizon",
-                "A Lasting Impression"
-            ]
-            subtitles = [
-                "Capturing the essence and motion of the scene",
-                "Subtle details emerge through natural light",
-                "The focal energy reaches its peak",
-                "Silence settles over the cinematic vista"
-            ]
-            voiceovers = [
-                f"An exploration into {clean_prompt}.",
-                "Every element comes together in harmonious balance.",
-                "Notice the depth and transition in this perspective.",
-                "Thank you for watching FreeVerse Video Studio."
-            ]
-            motion = "ken_burns_zoom_in" if i % 2 == 0 else "ken_burns_zoom_out"
-
-        scene_title = titles[i % len(titles)]
-        scene_sub = subtitles[i % len(subtitles)]
-        scene_vo = voiceovers[i % len(voiceovers)]
+        scene_title, scene_sub, scene_vo, motion = build_dynamic_scene_content(
+            clean_prompt=clean_prompt,
+            style=style,
+            index=i,
+            total_scenes=scene_count,
+            doc_lines=doc_lines
+        )
 
         # Procedural visual card
         w, h = (1080, 1920) if aspect == "9:16" else (1920, 1080)

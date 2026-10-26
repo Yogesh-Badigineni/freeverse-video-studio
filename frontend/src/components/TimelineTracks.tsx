@@ -120,37 +120,54 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
               VIDEO / SCENE TRACK
             </div>
             <div style={{ display: 'flex', height: '52px', gap: '3px' }}>
-              {project.scenes.map((scene, idx) => {
-                const widthPx = Math.max(50, scene.duration * pixelsPerSec);
-                const isActive = idx === activeSceneIndex;
-                return (
-                  <div
-                    key={scene.id || idx}
-                    onClick={() => onSelectScene(idx)}
-                    style={{
-                      width: `${widthPx}px`,
-                      background: isActive ? 'linear-gradient(135deg, #4F46E5, #6366F1)' : 'var(--bg-tertiary)',
-                      border: `1px solid ${isActive ? '#818CF8' : 'var(--border-subtle)'}`,
-                      borderRadius: '6px',
-                      padding: '6px 8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      overflow: 'hidden',
-                      flexShrink: 0
-                    }}
-                  >
-                    <span style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {idx + 1}. {scene.title}
-                    </span>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
-                      <span>{scene.motion_effect.split('_')[0]}</span>
-                      <span>{scene.duration}s</span>
+              {project.scenes.length === 0 ? (
+                <div style={{
+                  height: '52px',
+                  border: '1px dashed var(--border-subtle)',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)',
+                  fontSize: '11px',
+                  padding: '0 16px',
+                  background: 'var(--bg-tertiary)'
+                }}>
+                  No scenes on timeline yet. Click "+ Add Scene" above.
+                </div>
+              ) : (
+                project.scenes.map((scene, idx) => {
+                  const widthPx = Math.max(50, scene.duration * pixelsPerSec);
+                  const isActive = idx === activeSceneIndex;
+                  return (
+                    <div
+                      key={scene.id || idx}
+                      onClick={() => onSelectScene(idx)}
+                      style={{
+                        width: `${widthPx}px`,
+                        background: isActive ? 'linear-gradient(135deg, #4F46E5, #6366F1)' : 'var(--bg-tertiary)',
+                        border: `1px solid ${isActive ? '#818CF8' : 'var(--border-subtle)'}`,
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        overflow: 'hidden',
+                        flexShrink: 0
+                      }}
+                    >
+                      <span style={{ fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {idx + 1}. {scene.title}
+                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
+                        <span>{(scene.motion_effect || 'none').split('_')[0]}</span>
+                        <span>{scene.duration}s</span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 

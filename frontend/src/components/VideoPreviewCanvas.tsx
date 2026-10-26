@@ -8,8 +8,9 @@ import {
   VolumeX, 
   Monitor, 
   Smartphone, 
-  Square,
-  Sparkles
+  Square, 
+  Sparkles,
+  Plus
 } from 'lucide-react';
 import { Project, Scene, AspectRatio, Resolution } from '../types/studio';
 
@@ -18,13 +19,17 @@ interface VideoPreviewCanvasProps {
   activeSceneIndex: number;
   onSelectScene: (index: number) => void;
   onUpdateProjectSettings: (aspect: AspectRatio, res: Resolution) => void;
+  onAddScene?: () => void;
+  onOpenPromptStudio?: () => void;
 }
 
 export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
   project,
   activeSceneIndex,
   onSelectScene,
-  onUpdateProjectSettings
+  onUpdateProjectSettings,
+  onAddScene,
+  onOpenPromptStudio
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -42,6 +47,24 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
   useEffect(() => {
     setImgError(false);
   }, [currentScene?.id, currentScene?.asset_url]);
+
+  // Spacebar keyboard shortcut to Play/Pause
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput = 
+        activeEl?.tagName === 'INPUT' || 
+        activeEl?.tagName === 'TEXTAREA' || 
+        (activeEl as HTMLElement)?.isContentEditable;
+
+      if (e.code === 'Space' && !isInput) {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, currentTime, totalDuration]);
 
   // Playback timer loop
   useEffect(() => {
@@ -96,6 +119,15 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
     setCurrentTime(newTime);
   };
 
+  const handleToggleFullscreen = () => {
+    if (!containerRef.current) return;
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
+
   // Determine CSS aspect ratio
   const getAspectRatioStyle = () => {
     switch (project.aspect_ratio) {
@@ -121,6 +153,12 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
       default:
         return {};
     }
+  };
+
+  const formatTime = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const secs = (sec % 60).toFixed(1);
+    return `${mins.toString().padStart(2, '0')}:${parseFloat(secs) < 10 ? '0' : ''}${secs}`;
   };
 
   return (
@@ -159,19 +197,30 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
           ))}
         </div>
 
-        {/* Resolution Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Quality:</span>
-          <select
-            className="select-field"
-            style={{ padding: '3px 8px', fontSize: '11px' }}
-            value={project.resolution}
-            onChange={(e) => onUpdateProjectSettings(project.aspect_ratio, e.target.value as Resolution)}
+        {/* Resolution & Speed Selectors */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Quality:</span>
+            <select
+              className="select-field"
+              style={{ padding: '3px 8px', fontSize: '11px' }}
+              value={project.resolution}
+              onChange={(e) => onUpdateProjectSettings(project.aspect_ratio, e.target.value as Resolution)}
+            >
+              <option value="720p">720p HD</option>
+              <option value="1080p">1080p Full HD</option>
+              <option value="4k">4K Ultra HD</option>
+            </select>
+          </div>
+
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={handleToggleFullscreen}
+            title="Fullscreen Preview"
+            style={{ padding: '4px 8px' }}
           >
-            <option value="720p">720p HD</option>
-            <option value="1080p">1080p Full HD</option>
-            <option value="4k">4K Ultra HD</option>
-          </select>
+            <Maximize2 size={13} />
+          </button>
         </div>
       </div>
 
@@ -189,104 +238,155 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
           position: 'relative'
         }}
       >
-        <div
-          style={{
-            ...getAspectRatioStyle(),
-            background: currentScene?.background_color || '#1A1A24',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            position: 'relative',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          {/* Visual Asset Layer */}
-          {currentScene?.asset_url && !imgError ? (
-            <img
-              src={currentScene.asset_url}
-              alt={currentScene.title}
-              onError={() => setImgError(true)}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                ...getMotionAnimationClass(currentScene.motion_effect)
-              }}
-            />
-          ) : (
-            <div style={{ textAlign: 'center', padding: '20px' }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.05)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '12px'
-              }}>
-                <Sparkles size={28} color="var(--primary)" />
-              </div>
-              <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>{currentScene?.title}</h4>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Motion: {currentScene?.motion_effect.replace(/_/g, ' ')}
-              </p>
+        {project.scenes.length === 0 ? (
+          <div
+            style={{
+              ...getAspectRatioStyle(),
+              background: '#0D0D14',
+              borderRadius: '8px',
+              border: '2px dashed var(--border-subtle)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '28px',
+              textAlign: 'center',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8)'
+            }}
+          >
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'rgba(99, 102, 241, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '14px'
+            }}>
+              <Sparkles size={26} color="var(--primary)" />
             </div>
-          )}
-
-          {/* Subtitle / Text Overlay Box */}
-          {currentScene?.text_overlay && (
-            <div
-              style={{
-                position: 'absolute',
-                left: '5%',
-                right: '5%',
-                bottom: currentScene.text_position === 'bottom' ? '8%' : currentScene.text_position === 'top' ? 'auto' : '35%',
-                top: currentScene.text_position === 'top' ? '8%' : 'auto',
-                background: currentScene.text_bg || 'rgba(0, 0, 0, 0.7)',
-                backdropFilter: 'blur(8px)',
-                padding: '12px 18px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                textAlign: 'center',
-                color: currentScene.text_color || '#FFFFFF',
-                fontSize: `${Math.max(12, Math.min(22, currentScene.font_size * 0.5))}px`,
-                fontWeight: 600,
-                lineHeight: 1.4,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                whiteSpace: 'pre-line'
-              }}
-            >
-              {currentScene.text_overlay}
+            <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', marginBottom: '6px' }}>
+              No Scenes in Project
+            </h4>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '320px', marginBottom: '16px' }}>
+              Add your first scene or let the smart AI script assistant generate a full video storyboard.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {onAddScene && (
+                <button className="btn btn-primary btn-sm" onClick={onAddScene}>
+                  <Plus size={14} /> Add Scene
+                </button>
+              )}
+              {onOpenPromptStudio && (
+                <button className="btn btn-secondary btn-sm" onClick={onOpenPromptStudio}>
+                  <Sparkles size={14} /> AI Script Assistant
+                </button>
+              )}
             </div>
-          )}
-
-          {/* Scene indicator tag */}
-          <div style={{
-            position: 'absolute',
-            top: '10px',
-            left: '10px',
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(4px)',
-            padding: '3px 8px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            color: '#FFFFFF',
-            fontWeight: 600
-          }}>
-            Scene {activeSceneIndex + 1}/{project.scenes.length} • {currentScene?.duration}s
           </div>
-        </div>
+        ) : (
+          <div
+            style={{
+              ...getAspectRatioStyle(),
+              background: currentScene?.background_color || '#1A1A24',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {/* Visual Asset Layer */}
+            {currentScene?.asset_url && !imgError ? (
+              <img
+                src={currentScene.asset_url}
+                alt={currentScene.title}
+                onError={() => setImgError(true)}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  ...getMotionAnimationClass(currentScene.motion_effect || 'none')
+                }}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <Sparkles size={28} color="var(--primary)" />
+                </div>
+                <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>{currentScene?.title}</h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Motion: {(currentScene?.motion_effect || 'none').replace(/_/g, ' ')}
+                </p>
+              </div>
+            )}
+
+            {/* Subtitle / Text Overlay Box */}
+            {currentScene?.text_overlay && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '5%',
+                  right: '5%',
+                  bottom: currentScene.text_position === 'bottom' ? '8%' : currentScene.text_position === 'top' ? 'auto' : '35%',
+                  top: currentScene.text_position === 'top' ? '8%' : 'auto',
+                  background: currentScene.text_bg || 'rgba(0, 0, 0, 0.7)',
+                  backdropFilter: 'blur(8px)',
+                  padding: '12px 18px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  textAlign: 'center',
+                  color: currentScene.text_color || '#FFFFFF',
+                  fontSize: `${Math.max(12, Math.min(22, (currentScene.font_size || 32) * 0.5))}px`,
+                  fontWeight: 600,
+                  lineHeight: 1.4,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                  whiteSpace: 'pre-line'
+                }}
+              >
+                {currentScene.text_overlay}
+              </div>
+            )}
+
+            {/* Scene indicator tag */}
+            {currentScene && (
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+                background: 'rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(4px)',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                color: '#FFFFFF',
+                fontWeight: 600
+              }}>
+                Scene {activeSceneIndex + 1}/{project.scenes.length} • {currentScene.duration}s
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Scrubbing & Playback Bar */}
       <div style={{ padding: '12px 16px', background: 'var(--bg-tertiary)', borderTop: '1px solid var(--border-subtle)' }}>
         {/* Time slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', minWidth: '40px' }}>
-            {currentTime.toFixed(1)}s
+          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', minWidth: '45px' }}>
+            {formatTime(currentTime)}
           </span>
           <input
             type="range"
@@ -297,8 +397,8 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
             onChange={(e) => handleSeek(parseFloat(e.target.value))}
             style={{ flex: 1, accentColor: 'var(--primary)', cursor: 'pointer' }}
           />
-          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', minWidth: '40px' }}>
-            {totalDuration.toFixed(1)}s
+          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', minWidth: '45px' }}>
+            {formatTime(totalDuration)}
           </span>
         </div>
 
@@ -309,7 +409,7 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
               className="btn btn-primary btn-sm"
               onClick={togglePlay}
               style={{ width: '34px', height: '34px', padding: 0, borderRadius: '50%' }}
-              title={isPlaying ? 'Pause' : 'Play'}
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
             >
               {isPlaying ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: '2px' }} />}
             </button>
@@ -320,12 +420,28 @@ export const VideoPreviewCanvas: React.FC<VideoPreviewCanvasProps> = ({
             >
               <RotateCcw size={14} />
             </button>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', marginLeft: '6px' }}>
-              {project.scenes[activeSceneIndex]?.title}
-            </span>
+            {project.scenes[activeSceneIndex] && (
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', marginLeft: '6px' }}>
+                {activeSceneIndex + 1}. {project.scenes[activeSceneIndex].title}
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Speed toggle button */}
+            <button
+              className="btn btn-outline btn-sm"
+              style={{ padding: '3px 8px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+              onClick={() => {
+                const speeds = [1, 1.25, 1.5, 2, 0.5];
+                const nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
+                setPlaybackSpeed(speeds[nextIdx]);
+              }}
+              title="Playback speed"
+            >
+              {playbackSpeed}x
+            </button>
+
             <button 
               className="btn btn-outline btn-sm"
               onClick={() => setIsMuted(!isMuted)}

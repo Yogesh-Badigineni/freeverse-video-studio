@@ -44,7 +44,7 @@ export async function deleteProject(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/projects/${id}`, {
     method: 'DELETE'
   });
-  if (!res.ok) throw new Error('Failed to delete project');
+  if (!res.ok && res.status !== 404) throw new Error('Failed to delete project');
 }
 
 export async function duplicateProject(id: string): Promise<Project> {

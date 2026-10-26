@@ -91,10 +91,9 @@ def delete_project(project_id: str) -> bool:
         file_path = resolve_safe_path(PROJECTS_DIR, f"{project_id}.json")
         if file_path.exists():
             file_path.unlink()
-            return True
+        return True
     except Exception:
-        pass
-    return False
+        return False
 
 # Initializer for sample demonstration assets (100% copyright-free procedural images)
 def init_sample_assets_if_empty():
